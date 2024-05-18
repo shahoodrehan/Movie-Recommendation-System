@@ -12,7 +12,6 @@ class MovieRecommendationSystem:
         self.logged_in_user = None
         self.tf_idf_vectorizer = TfidfVectorizer()
         self.search_array = []  # To store search inputs
-        # self.tmdb_api_key = tmdb_api_key  # TMDB API key
 
     def load_imdb_dataset(self, path):
         return pd.read_csv(path)
@@ -145,23 +144,46 @@ class MovieRecommendationSystem:
         else:
             print("Please login first.")
 
-    def get_movie_poster(self, movie_id):
-        url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key=9eeecccb8c47f32eeae0f068e5f6348f"
-        response = requests.get(url)
-        if response.status_code == 200:
-            data = response.json()
-            if 'poster_path' in data and data['poster_path']:
-                image_url = f"https://image.tmdb.org/t/p/w500{data['poster_path']}"
-                return image_url
-            else:
-                print(f"No poster found for movie ID '{movie_id}'")
-                return None
+    def get_poster_url_from_title(self, movie_title, api_key):
+        """
+        Given a movie title, fetch the IMDb link from the dataset,
+        extract the IMDb ID, and then get the poster URL using the OMDb API.
+        """
+        movie_row = self.imdb_dataset[self.imdb_dataset['movie_title'].str.contains(movie_title, case=False, na=False)]
+        if not movie_row.empty:
+            imdb_url = movie_row.iloc[0]['movie_imdb_link']
+            poster_url = self.get_movie_poster(imdb_url, api_key)
+            return poster_url
         else:
-            print(f"Failed to retrieve data from TMDB: {response.status_code}")
+            print(f"No movie found with title '{movie_title}'.")
             return None
 
+    def get_movie_poster(self, imdb_url, api_key):
+        """
+        Retrieves the movie poster URL from the OMDb API.
+        """
+        imdb_id = self.extract_imdb_id(imdb_url)
+        omdb_url = f"http://www.omdbapi.com/?i={imdb_id}&apikey={api_key}"
+        
+        response = requests.get(omdb_url)
+        if response.status_code != 200:
+            print(f"Failed to retrieve data from OMDb API: {response.status_code}")
+            return None
+
+        data = response.json()
+        if 'Poster' in data and data['Poster'] != 'N/A':
+            return data['Poster']
+        
+        print(f"No poster image found for movie ID '{imdb_id}'")
+        return None
+
+    def extract_imdb_id(self, url):
+        return url.split('/')[4]
+
 if __name__ == "__main__":
-    # tmdb_api_key = 'YOUR_TMDB_API_KEY'  # Replace with your TMDB API key
+    # Replace with your actual OMDb API key
+    api_key = 'ad45e532'
+    
     system = MovieRecommendationSystem("movie_dataset.csv", "User_history.csv", "User_searches.csv")
     username = input("Enter username: ")
     password = input("Enter password: ")
@@ -174,7 +196,6 @@ if __name__ == "__main__":
         system.record_user_history(movie_title)
         search_input = input("Search for a movie: ")
         system.on_change_search(search_input)
-        movie_id = input("Enter movie ID: ")
-        image_url = system.get_movie_poster(movie_id)
-        if image_url:
-            print(f"Image URL for movie ID '{movie_id}': {image_url}")
+        poster_url = system.get_poster_url_from_title(movie_title, api_key)
+        if poster_url:
+            print(f"Poster URL for movie '{movie_title}': {poster_url}")
