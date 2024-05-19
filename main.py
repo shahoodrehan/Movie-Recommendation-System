@@ -59,11 +59,13 @@ class MovieRecommendationSystem:
             # Get indices of top 5 similar movies
             top_indices = similarity_scores.argsort(axis=1)[:, ::-1][:, 1:6]
 
-            # Print recommended movies with all metadata
+            # Print recommended movies with all metadata including poster URLs
             print(f"Top 5 recommended movies for user {self.logged_in_user}:")
             for indices in top_indices[0][:5]:  # Only take the first 5 indices
-                movie_metadata = self.imdb_dataset.iloc[indices]
-                print(movie_metadata.to_dict())
+                movie_metadata = self.imdb_dataset.iloc[indices].to_dict()
+                poster_url = self.get_poster_url_from_title(movie_metadata['movie_title'])
+                movie_metadata['poster_url'] = poster_url
+                print(movie_metadata)
         else:
             print("Please login first.")
 
@@ -82,7 +84,10 @@ class MovieRecommendationSystem:
         
         print("Top 5 initial recommended movies:")
         for indices in top_indices[0][:5]:  # Only take the first 5 indices
-            print(self.imdb_dataset.iloc[indices]['movie_title'])
+            movie_metadata = self.imdb_dataset.iloc[indices].to_dict()
+            poster_url = self.get_poster_url_from_title(movie_metadata['movie_title'])
+            movie_metadata['poster_url'] = poster_url
+            print(movie_metadata)
 
     def record_user_history(self, movie_name):
         # Search for the movie in the IMDb dataset
@@ -105,16 +110,20 @@ class MovieRecommendationSystem:
             print(f"Movie '{movie_name}' not found in the IMDb dataset.")
     
     def movie_category_filter(self, category):
-        # Split the 'genres' column and check if the category is in the genres
+    # Split the 'genres' column and check if the category is in the genres
         filtered_movies = self.imdb_dataset[self.imdb_dataset['genres'].str.contains(category, case=False, na=False)]
 
-        # Get the top 100 movies that match the category
+    # Get the top 100 movies that match the category
         top_100_movies = filtered_movies.head(100)
 
-        # Return or print the metadata of the filtered movies
+    # Return or print the metadata of the filtered movies
         print(f"Top 100 movies in category '{category}':")
         for _, movie in top_100_movies.iterrows():
-            print(movie.to_dict())
+            movie_metadata = movie.to_dict()
+            poster_url = self.get_poster_url_from_title(movie_metadata['movie_title'])
+            movie_metadata['poster_url'] = poster_url
+            print(movie_metadata)
+
 
     def on_change_search(self, search_input):
         if self.logged_in_user:
@@ -144,11 +153,12 @@ class MovieRecommendationSystem:
         else:
             print("Please login first.")
 
-    def get_poster_url_from_title(self, movie_title, api_key):
+    def get_poster_url_from_title(self, movie_title):
         """
         Given a movie title, fetch the IMDb link from the dataset,
         extract the IMDb ID, and then get the poster URL using the OMDb API.
         """
+        api_key = 'ad45e532'
         movie_row = self.imdb_dataset[self.imdb_dataset['movie_title'].str.contains(movie_title, case=False, na=False)]
         if not movie_row.empty:
             imdb_url = movie_row.iloc[0]['movie_imdb_link']
@@ -181,9 +191,6 @@ class MovieRecommendationSystem:
         return url.split('/')[4]
 
 if __name__ == "__main__":
-    # Replace with your actual OMDb API key
-    api_key = 'ad45e532'
-    
     system = MovieRecommendationSystem("movie_dataset.csv", "User_history.csv", "User_searches.csv")
     username = input("Enter username: ")
     password = input("Enter password: ")
@@ -196,6 +203,6 @@ if __name__ == "__main__":
         system.record_user_history(movie_title)
         search_input = input("Search for a movie: ")
         system.on_change_search(search_input)
-        poster_url = system.get_poster_url_from_title(movie_title, api_key)
+        poster_url = system.get_poster_url_from_title(movie_title)
         if poster_url:
             print(f"Poster URL for movie '{movie_title}': {poster_url}")
